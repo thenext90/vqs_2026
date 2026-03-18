@@ -771,6 +771,28 @@
       display: block;
     }
 
+    .form-error {
+      margin-top: 12px;
+      border: 1px solid rgba(205, 78, 78, 0.42);
+      border-radius: 10px;
+      background: rgba(205, 78, 78, 0.18);
+      color: #ffd7d7;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .form-error.show {
+      display: block;
+    }
+
+    .btn[disabled] {
+      opacity: 0.68;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
     .footer {
       background: #081326;
       color: rgba(255, 255, 255, 0.85);
@@ -1370,6 +1392,9 @@
             <div class="form-success" id="formSuccess" role="status" aria-live="polite">
               Recibimos tu solicitud. El equipo VQS te contactará pronto para iniciar la verificación.
             </div>
+            <div class="form-error" id="formError" role="alert" aria-live="assertive">
+              No se pudo enviar la solicitud. Intenta nuevamente en unos minutos.
+            </div>
           </form>
         </div>
       </div>
@@ -1447,6 +1472,7 @@
   <script>
     const CONFIG = {
       SHEET_CSV_URL: "REPLACE_WITH_YOUR_SHEET_CSV_URL",
+      FORMSPREE_ENDPOINT: "REPLACE_WITH_YOUR_FORMSPREE_ENDPOINT",
       REFRESH_INTERVAL_MS: 0
     };
 
@@ -1486,7 +1512,8 @@
       modalCertId: document.getElementById('modalCertId'),
       modalCertDate: document.getElementById('modalCertDate'),
       brandForm: document.getElementById('brandForm'),
-      formSuccess: document.getElementById('formSuccess')
+      formSuccess: document.getElementById('formSuccess'),
+      formError: document.getElementById('formError')
     };
 
     function escapeHTML(value) {
@@ -1874,8 +1901,33 @@
       });
     }
 
+    function setFormMessage(type, message = '') {
+      ui.formSuccess.classList.remove('show');
+      ui.formError.classList.remove('show');
+
+      if (type === 'success') {
+        if (message) ui.formSuccess.textContent = message;
+        ui.formSuccess.classList.add('show');
+      }
+
+      if (type === 'error') {
+        if (message) ui.formError.textContent = message;
+        ui.formError.classList.add('show');
+      }
+    }
+
+    function extractFormspreeError(payload) {
+      if (!payload) return 'No se pudo enviar la solicitud. Intenta nuevamente en unos minutos.';
+      if (Array.isArray(payload.errors) && payload.errors.length) {
+        const firstError = payload.errors[0];
+        if (firstError && firstError.message) return firstError.message;
+      }
+      if (typeof payload.error === 'string' && payload.error.trim()) return payload.error;
+      return 'No se pudo enviar la solicitud. Intenta nuevamente en unos minutos.';
+    }
+
     function bindForm() {
-      ui.brandForm.addEventListener('submit', (event) => {
+      ui.brandForm.addEventListener('submit', async (event) => {
         event.preventDefault();
 
         if (!ui.brandForm.checkValidity()) {
@@ -1883,12 +1935,61 @@
           return;
         }
 
-        ui.brandForm.reset();
-        ui.formSuccess.classList.add('show');
+        const endpoint = String(CONFIG.FORMSPREE_ENDPOINT || '').trim();
+        if (!endpoint || endpoint === 'REPLACE_WITH_YOUR_FORMSPREE_ENDPOINT') {
+          setFormMessage('error', 'Falta configurar Formspree en CONFIG.FORMSPREE_ENDPOINT.');
+          return;
+        }
 
-        setTimeout(() => {
-          ui.formSuccess.classList.remove('show');
-        }, 4500);
+        const submitButton = ui.brandForm.querySelector('.form-submit');
+        const originalLabel = submitButton ? submitButton.textContent : '';
+
+        setFormMessage('none');
+
+        if (submitButton) {
+          submitButton.disabled = true;
+          submitButton.textContent = 'Enviando...';
+        }
+
+        try {
+          const formData = new FormData(ui.brandForm);
+          formData.append('_subject', 'Nueva solicitud de certificación VQS');
+
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json'
+            },
+            body: formData
+          });
+
+          if (!response.ok) {
+            let payload = null;
+            try {
+              payload = await response.json();
+            } catch (_) {
+              payload = null;
+            }
+            throw new Error(extractFormspreeError(payload));
+          }
+
+          ui.brandForm.reset();
+          setFormMessage('success', 'Solicitud enviada correctamente. El equipo VQS te contactará pronto.');
+
+          setTimeout(() => {
+            ui.formSuccess.classList.remove('show');
+          }, 4500);
+        } catch (error) {
+          const message = error && error.message
+            ? error.message
+            : 'No se pudo enviar la solicitud. Intenta nuevamente en unos minutos.';
+          setFormMessage('error', message);
+        } finally {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalLabel || 'Solicitar evaluación VQS';
+          }
+        }
       });
     }
 
