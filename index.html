@@ -786,6 +786,16 @@
       display: block;
     }
 
+    .hp-field {
+      position: absolute !important;
+      left: -9999px !important;
+      width: 1px !important;
+      height: 1px !important;
+      overflow: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
     .btn[disabled] {
       opacity: 0.68;
       cursor: not-allowed;
@@ -1366,6 +1376,11 @@
 
         <div class="form-card">
           <form id="brandForm" novalidate action="https://formspree.io/f/mreyrqvn" method="POST">
+            <input type="hidden" name="form_name" value="vqs-certificacion-marcas" />
+            <div class="hp-field" aria-hidden="true">
+              <label for="empresa_web">No completar este campo</label>
+              <input id="empresa_web" name="_gotcha" type="text" tabindex="-1" autocomplete="off" />
+            </div>
             <div class="form-grid">
               <div class="form-group">
                 <label for="nombre">Nombre</label>
@@ -1493,7 +1508,8 @@
       refreshTimer: null,
       activeProduct: null,
       statsAnimated: false,
-      lastFocusedEl: null
+      lastFocusedEl: null,
+      formStartedAt: Date.now()
     };
 
     const ui = {
@@ -1926,12 +1942,23 @@
       return 'No se pudo enviar la solicitud. Intenta nuevamente en unos minutos.';
     }
 
+    function resetFormTimer() {
+      state.formStartedAt = Date.now();
+    }
+
     function bindForm() {
       ui.brandForm.addEventListener('submit', async (event) => {
         event.preventDefault();
 
         if (!ui.brandForm.checkValidity()) {
           ui.brandForm.reportValidity();
+          return;
+        }
+
+        const elapsedMs = Date.now() - state.formStartedAt;
+        if (elapsedMs < 2500) {
+          setFormMessage('error', 'Solicitud rechazada por seguridad. Completa el formulario nuevamente.');
+          resetFormTimer();
           return;
         }
 
@@ -1955,6 +1982,17 @@
           const formData = new FormData(ui.brandForm);
           formData.append('_subject', 'Nueva solicitud de certificación VQS');
 
+          const honeypot = String(formData.get('_gotcha') || '').trim();
+          if (honeypot) {
+            setFormMessage('success', 'Solicitud enviada correctamente. El equipo VQS te contactará pronto.');
+            ui.brandForm.reset();
+            resetFormTimer();
+            setTimeout(() => {
+              ui.formSuccess.classList.remove('show');
+            }, 4500);
+            return;
+          }
+
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -1974,6 +2012,7 @@
           }
 
           ui.brandForm.reset();
+          resetFormTimer();
           setFormMessage('success', 'Solicitud enviada correctamente. El equipo VQS te contactará pronto.');
 
           setTimeout(() => {
@@ -1989,6 +2028,12 @@
             submitButton.disabled = false;
             submitButton.textContent = originalLabel || 'Solicitar evaluación VQS';
           }
+        }
+      });
+
+      ui.brandForm.addEventListener('input', () => {
+        if (ui.formError.classList.contains('show')) {
+          ui.formError.classList.remove('show');
         }
       });
     }
