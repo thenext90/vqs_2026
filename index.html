@@ -1365,7 +1365,7 @@
         </div>
 
         <div class="form-card">
-          <form id="brandForm" novalidate>
+          <form id="brandForm" novalidate action="https://formspree.io/f/mreyrqvn" method="POST">
             <div class="form-grid">
               <div class="form-group">
                 <label for="nombre">Nombre</label>
@@ -1472,7 +1472,7 @@
   <script>
     const CONFIG = {
       SHEET_CSV_URL: "REPLACE_WITH_YOUR_SHEET_CSV_URL",
-      FORMSPREE_ENDPOINT: "REPLACE_WITH_YOUR_FORMSPREE_ENDPOINT",
+      FORMSPREE_ENDPOINT: "https://formspree.io/f/mreyrqvn",
       REFRESH_INTERVAL_MS: 0
     };
 
@@ -1935,7 +1935,7 @@
           return;
         }
 
-        const endpoint = String(CONFIG.FORMSPREE_ENDPOINT || '').trim();
+        const endpoint = String(CONFIG.FORMSPREE_ENDPOINT || ui.brandForm.getAttribute('action') || '').trim();
         if (!endpoint || endpoint === 'REPLACE_WITH_YOUR_FORMSPREE_ENDPOINT') {
           setFormMessage('error', 'Falta configurar Formspree en CONFIG.FORMSPREE_ENDPOINT.');
           return;
