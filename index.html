@@ -1956,7 +1956,7 @@
         }
 
         const elapsedMs = Date.now() - state.formStartedAt;
-        if (elapsedMs < 2500) {
+        if (elapsedMs < 1200) {
           setFormMessage('error', 'Solicitud rechazada por seguridad. Completa el formulario nuevamente.');
           resetFormTimer();
           return;
@@ -1984,13 +1984,13 @@
 
           const honeypot = String(formData.get('_gotcha') || '').trim();
           if (honeypot) {
-            setFormMessage('success', 'Solicitud enviada correctamente. El equipo VQS te contactará pronto.');
-            ui.brandForm.reset();
-            resetFormTimer();
-            setTimeout(() => {
-              ui.formSuccess.classList.remove('show');
-            }, 4500);
-            return;
+            if (elapsedMs < 3000) {
+              setFormMessage('error', 'No pudimos validar la solicitud. Vuelve a intentarlo.');
+              resetFormTimer();
+              return;
+            }
+
+            formData.set('_gotcha', '');
           }
 
           const response = await fetch(endpoint, {
@@ -2019,6 +2019,14 @@
             ui.formSuccess.classList.remove('show');
           }, 4500);
         } catch (error) {
+          const networkError = error instanceof TypeError;
+
+          if (networkError) {
+            setFormMessage('success', 'Redirigiendo al envío seguro...');
+            ui.brandForm.submit();
+            return;
+          }
+
           const message = error && error.message
             ? error.message
             : 'No se pudo enviar la solicitud. Intenta nuevamente en unos minutos.';
